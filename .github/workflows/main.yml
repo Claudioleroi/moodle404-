@@ -1,42 +1,83 @@
-name: Deploy Moodle to EC2
+name: Build The Theme & Deploy
 
 on:
-  push:
+  pull_request:
     branches:
-      - main
+      - dev-deploy
+    types: [closed]
+
+defaults:
+  run:
+    working-directory: moodle
 
 jobs:
-  deploy:
+  run-github-action:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-
-    - name: Setup SSH
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
-
-    - name: Remove existing Moodle directory on EC2
-      run: |
-        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          sudo rm -rf /var/www/html/moodle/*
-          sudo mkdir -p /var/www/html/moodle
-          sudo chown -R $USER:$USER /var/www/html/moodle
-          exit
-        EOF
-
-    - name: Copy Moodle code to EC2
-      run: |
-        scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -r ./moodle/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/html/moodle/
-
-    - name: Set permissions and restart Apache on EC2
-      run: |
-        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          sudo chown -R www-data:www-data /var/www/html/moodle
-          sudo systemctl restart apache2
-          exit
-        EOF
+      - uses: actions/checkout@v2
+      
+      - name: Get npm cache directory
+        id: npm-cache-dir
+        run: |
+          echo "::set-output name=dir::$(npm config get cache)"
+          
+      - uses: actions/cache@v3
+        id: npm-cache
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+            
+      - name: ADD NODE JS v12.x
+        uses: actions/setup-node@v2
+        with:
+          node-version: "12.x"
+          
+      - name: ADD PHP v 7.4.x
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "7.4"
+          tools: composer:v2
+          
+      - name: RUN NPM
+        run: npm ci
+        
+      - name: RUN COMPOSER
+        run: composer install
+        
+      - name: BUILD THEME
+        run: npm run prod
+        
+      - name: Before Deployment
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: "22"
+          script: |
+            sudo rm -rf /var/www/html/moodle/*
+            sudo chown -R ubuntu /var/www/html/moodle/
+            
+      - name: Deploy to AWS Server
+        uses: easingthemes/ssh-deploy@main
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.EC2_HOST }}
+          REMOTE_USER: ${{ secrets.EC2_USER }}
+          SOURCE: "./moodle/"
+          TARGET: "/var/www/html/moodle/"
+          EXCLUDE: "/node_modules/"
+          
+      - name: After Deployment
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT }}
+          script: |
+            sudo chown -R www-data:www-data /var/www/html/moodle/
+            sudo systemctl restart apache2

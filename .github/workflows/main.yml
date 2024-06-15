@@ -8,7 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -22,9 +22,9 @@ jobs:
       run: |
         REMOTE_USER="ubuntu"
         REMOTE_HOST="${{ secrets.EC2_PUBLIC_IP }}"
-        REMOTE_PATH="/var/www/html/moodle"
+        REMOTE_PATH="/var/www/html/"
 
-        scp -o StrictHostKeyChecking=no -r ./* $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH
+        scp -o StrictHostKeyChecking=no -r ./html/* $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH
 
     - name: Restart Apache on EC2
       run: |

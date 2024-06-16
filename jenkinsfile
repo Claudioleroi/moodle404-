@@ -13,6 +13,14 @@ pipeline {
                 script {
                     // Installer Git LFS
                     sh 'git lfs install'
+                    
+                    // Configurer Git pour des connexions plus robustes
+                    sh '''
+                        git config --global http.postBuffer 1048576000
+                        git config --global core.compression -1
+                        git config --global http.lowSpeedLimit 0
+                        git config --global http.lowSpeedTime 999999
+                    '''
 
                     // Cloner le dépôt GitHub avec Git LFS activé
                     git(
@@ -20,8 +28,8 @@ pipeline {
                         branch: "${env.BRANCH_NAME}",
                         credentialsId: "${env.GIT_CREDENTIALS_ID}",
                         extensions: [
-                            [$class: 'CloneOption', timeout: 60], // Augmenter le délai d'attente du clonage à 60 minutes
-                            [$class: 'CheckoutOption', timeout: 60], // Augmenter le délai d'attente du checkout à 60 minutes
+                            [$class: 'CloneOption', timeout: 120], // Augmenter le délai d'attente du clonage à 120 minutes
+                            [$class: 'CheckoutOption', timeout: 120], // Augmenter le délai d'attente du checkout à 120 minutes
                             [$class: 'GitLFSPull'],
                             [$class: 'LocalBranch', localBranch: "${env.BRANCH_NAME}"]
                         ]

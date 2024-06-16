@@ -1,0 +1,38 @@
+pipeline {
+    agent any
+
+    environment {
+        GIT_REPO_URL = 'https://github.com/Claudioleroi/moodle404-.git'
+        BRANCH_NAME = 'main'
+        GIT_CREDENTIALS_ID = 'github-credentials' // Remplacez par l'ID des identifiants GitHub configurés dans Jenkins
+    }
+
+    stages {
+        stage('Checkout Repository') {
+            steps {
+                script {
+                    // Installer Git LFS si nécessaire
+                    sh 'git lfs install'
+
+                    // Cloner le dépôt GitHub avec Git LFS activé
+                    git(
+                        url: "${env.GIT_REPO_URL}",
+                        branch: "${env.BRANCH_NAME}",
+                        credentialsId: "${env.GIT_CREDENTIALS_ID}",
+                        extensions: [
+                            [$class: 'CloneOption', timeout: 30],
+                            [$class: 'CheckoutOption', timeout: 30],
+                            [$class: 'GitLFSPull']
+                        ]
+                    )
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

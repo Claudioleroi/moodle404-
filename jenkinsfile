@@ -11,7 +11,7 @@ pipeline {
         stage('Checkout Repository') {
             steps {
                 script {
-                    // Installer Git LFS si nécessaire
+                    // Installer Git LFS
                     sh 'git lfs install'
 
                     // Cloner le dépôt GitHub avec Git LFS activé
@@ -20,9 +20,10 @@ pipeline {
                         branch: "${env.BRANCH_NAME}",
                         credentialsId: "${env.GIT_CREDENTIALS_ID}",
                         extensions: [
-                            [$class: 'CloneOption', timeout: 30],
-                            [$class: 'CheckoutOption', timeout: 30],
-                            [$class: 'GitLFSPull']
+                            [$class: 'CloneOption', timeout: 60], // Augmenter le délai d'attente du clonage à 60 minutes
+                            [$class: 'CheckoutOption', timeout: 60], // Augmenter le délai d'attente du checkout à 60 minutes
+                            [$class: 'GitLFSPull'],
+                            [$class: 'LocalBranch', localBranch: "${env.BRANCH_NAME}"]
                         ]
                     )
                 }
